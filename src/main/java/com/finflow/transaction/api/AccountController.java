@@ -3,6 +3,7 @@ package com.finflow.transaction.api;
 import com.finflow.transaction.api.dto.AccountResponse;
 import com.finflow.transaction.api.dto.BalanceResponse;
 import com.finflow.transaction.api.dto.CreateAccountRequest;
+import com.finflow.transaction.api.dto.DepositRequest;
 import com.finflow.transaction.api.mapper.AccountMapper;
 import com.finflow.transaction.application.AccountService;
 import com.finflow.transaction.domain.Account;
@@ -54,6 +55,21 @@ public class AccountController {
         log.debug("GET /accounts/{}", id);
 
         Account account = accountService.getAccount(id);
+
+        return ResponseEntity.ok(AccountMapper.toResponse(account));
+    }
+
+    /**
+     * Deposit funds into an account.
+     */
+    @PostMapping("/{id}/deposit")
+    public ResponseEntity<AccountResponse> deposit(
+            @PathVariable UUID id,
+            @Valid @RequestBody DepositRequest request) {
+
+        log.info("POST /accounts/{}/deposit - amount: {}", id, request.amount());
+
+        Account account = accountService.deposit(id, request.amount());
 
         return ResponseEntity.ok(AccountMapper.toResponse(account));
     }

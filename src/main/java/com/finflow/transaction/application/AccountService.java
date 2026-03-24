@@ -8,6 +8,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.UUID;
 
 @Service
@@ -29,6 +30,24 @@ public class AccountService {
         Account saved = accountRepository.save(account);
 
         log.info("Account created successfully: {}", saved.getId());
+        return saved;
+    }
+
+    @Transactional
+    public Account deposit(UUID accountId, BigDecimal amount) {
+        log.info("Deposit initiated: accountId={}, amount={}", accountId, amount);
+
+        Account account = accountRepository.findById(accountId)
+            .orElseThrow(() -> new ResourceNotFoundException("Account", "id", accountId));
+
+        if (account.getStatus() != com.finflow.transaction.domain.AccountStatus.ACTIVE) {
+            throw new IllegalStateException("Account is not active: " + accountId);
+        }
+
+        account.deposit(amount);
+        Account saved = accountRepository.save(account);
+
+        log.info("Deposit completed: accountId={}, newBalance={}", accountId, saved.getBalance());
         return saved;
     }
 
