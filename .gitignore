@@ -22,3 +22,39 @@
 # virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
 hs_err_pid*
 replay_pid*
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.settings/
+.project
+.classpath
+
+# Environment & Secrets
+.env
+.env.local
+*.pem
+*.key
+application-local.yml
+application-secrets.yml
+
+# Docker
+docker-compose.override.yml
+
+# Terraform (ileride lazım)
+.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfvars
+
+# Logs
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Coverage reports
+build/
+coverage/
