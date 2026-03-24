@@ -73,6 +73,19 @@ public class GlobalExceptionHandler {
         return problem;
     }
 
+    @ExceptionHandler(RateLimitExceededException.class)
+    public ProblemDetail handleRateLimitExceeded(RateLimitExceededException ex) {
+        log.warn("Rate limit exceeded: {}", ex.getMessage());
+
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+            HttpStatus.TOO_MANY_REQUESTS, ex.getMessage()
+        );
+        problem.setTitle("Rate Limit Exceeded");
+        problem.setType(URI.create("https://finflow.com/errors/rate-limit"));
+        problem.setProperty("timestamp", Instant.now());
+        return problem;
+    }
+
     @ExceptionHandler(Exception.class)
     public ProblemDetail handleGeneric(Exception ex) {
         log.error("Unexpected error: {}", ex.getMessage(), ex);

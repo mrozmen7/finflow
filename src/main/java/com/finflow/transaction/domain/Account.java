@@ -74,6 +74,20 @@ public class Account {
         this.balance = this.balance.subtract(amount);
     }
 
+    public void freeze() {
+        if (this.status != AccountStatus.ACTIVE) {
+            throw new IllegalStateException("Cannot freeze account in status: " + this.status);
+        }
+        this.status = AccountStatus.FROZEN;
+    }
+
+    public void close() {
+        if (this.status == AccountStatus.CLOSED) {
+            throw new IllegalStateException("Account is already closed");
+        }
+        this.status = AccountStatus.CLOSED;
+    }
+
     // Getters
     public UUID getId() { return id; }
     public String getOwnerName() { return ownerName; }

@@ -1,6 +1,9 @@
 package com.finflow.transaction.application;
 
+import com.finflow.shared.exception.RateLimitExceededException;
 import com.finflow.shared.exception.ResourceNotFoundException;
+import com.finflow.shared.util.IdempotencyService;
+import com.finflow.shared.util.RateLimiterService;
 import com.finflow.transaction.domain.Account;
 import com.finflow.transaction.domain.AccountStatus;
 import com.finflow.transaction.domain.Transaction;
@@ -14,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -24,16 +28,38 @@ public class TransactionService {
 
     private final TransactionRepository transactionRepository;
     private final AccountRepository accountRepository;
+    private final IdempotencyService idempotencyService;
+    private final RateLimiterService rateLimiterService;
 
     public TransactionService(TransactionRepository transactionRepository,
-                              AccountRepository accountRepository) {
+                              AccountRepository accountRepository,
+                              IdempotencyService idempotencyService,
+                              RateLimiterService rateLimiterService) {
         this.transactionRepository = transactionRepository;
         this.accountRepository = accountRepository;
+        this.idempotencyService = idempotencyService;
+        this.rateLimiterService = rateLimiterService;
     }
 
     @Transactional
     public Transaction transfer(UUID sourceAccountId, UUID targetAccountId,
-                                BigDecimal amount, String description) {
+                                BigDecimal amount, String description, String idempotencyKey) {
+
+        // Rate limit check — max 10 transfers per account per minute
+        if (!rateLimiterService.isAllowed(sourceAccountId)) {
+            throw new RateLimitExceededException(
+                "Transfer rate limit exceeded for account: " + sourceAccountId
+                + ". Please retry after one minute.");
+        }
+
+        // Idempotency check — return existing transaction if key already processed
+        Optional<UUID> existing = idempotencyService.get(idempotencyKey);
+        if (existing.isPresent()) {
+            log.info("Idempotent request detected for key: {}, returning existing transaction: {}",
+                     idempotencyKey, existing.get());
+            return transactionRepository.findById(existing.get())
+                .orElseThrow(() -> new ResourceNotFoundException("Transaction", "id", existing.get()));
+        }
 
         log.info("Transfer initiated: {} -> {}, amount: {}",
                  sourceAccountId, targetAccountId, amount);
@@ -90,7 +116,9 @@ public class TransactionService {
                      sourceAccountId, targetAccountId, e.getMessage());
         }
 
-        return transactionRepository.save(transaction);
+        Transaction saved = transactionRepository.save(transaction);
+        idempotencyService.store(idempotencyKey, saved.getId());
+        return saved;
     }
 
     @Transactional(readOnly = true)
@@ -109,6 +137,9 @@ public class TransactionService {
     private void validateTransferRequest(UUID sourceId, UUID targetId, BigDecimal amount) {
         if (sourceId.equals(targetId)) {
             throw new IllegalArgumentException("Cannot transfer to the same account");
+        }
+        if (amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Transfer amount must be positive");
         }
         if (amount.compareTo(MAX_TRANSFER_AMOUNT) > 0) {
             throw new IllegalArgumentException(

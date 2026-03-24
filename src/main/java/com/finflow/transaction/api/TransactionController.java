@@ -43,7 +43,8 @@ public class TransactionController {
             request.sourceAccountId(),
             request.targetAccountId(),
             request.amount(),
-            request.description()
+            request.description(),
+            request.idempotencyKey()
         );
 
         HttpStatus status = transaction.getStatus().name().equals("COMPLETED")

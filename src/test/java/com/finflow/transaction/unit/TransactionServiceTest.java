@@ -1,6 +1,8 @@
 package com.finflow.transaction.unit;
 
 import com.finflow.shared.exception.ResourceNotFoundException;
+import com.finflow.shared.util.IdempotencyService;
+import com.finflow.shared.util.RateLimiterService;
 import com.finflow.transaction.application.TransactionService;
 import com.finflow.transaction.domain.Account;
 import com.finflow.transaction.domain.AccountStatus;
@@ -36,8 +38,16 @@ class TransactionServiceTest {
     @Mock
     private AccountRepository accountRepository;
 
+    @Mock
+    private IdempotencyService idempotencyService;
+
+    @Mock
+    private RateLimiterService rateLimiterService;
+
     @InjectMocks
     private TransactionService transactionService;
+
+    private static final String IDEMPOTENCY_KEY = "test-key-" + UUID.randomUUID();
 
     private UUID sourceId;
     private UUID targetId;
@@ -58,6 +68,8 @@ class TransactionServiceTest {
             .thenAnswer(i -> i.getArgument(0));
         lenient().when(accountRepository.save(any(Account.class)))
             .thenAnswer(i -> i.getArgument(0));
+        lenient().when(idempotencyService.get(any())).thenReturn(Optional.empty());
+        lenient().when(rateLimiterService.isAllowed(any())).thenReturn(true);
     }
 
     @Nested
@@ -74,7 +86,7 @@ class TransactionServiceTest {
         @DisplayName("should complete transfer when source has sufficient balance")
         void should_CompleteTransfer_When_SufficientBalance() {
             Transaction result = transactionService.transfer(
-                sourceId, targetId, new BigDecimal("500"), "Test transfer");
+                sourceId, targetId, new BigDecimal("500"), "Test transfer", IDEMPOTENCY_KEY);
 
             assertThat(result.getStatus()).isEqualTo(TransactionStatus.COMPLETED);
         }
@@ -82,7 +94,7 @@ class TransactionServiceTest {
         @Test
         @DisplayName("should deduct amount from source account when transfer completes")
         void should_DeductFromSource_When_TransferCompleted() {
-            transactionService.transfer(sourceId, targetId, new BigDecimal("500"), null);
+            transactionService.transfer(sourceId, targetId, new BigDecimal("500"), null, IDEMPOTENCY_KEY);
 
             assertThat(source.getBalance()).isEqualByComparingTo(new BigDecimal("500"));
         }
@@ -90,7 +102,7 @@ class TransactionServiceTest {
         @Test
         @DisplayName("should add amount to target account when transfer completes")
         void should_AddToTarget_When_TransferCompleted() {
-            transactionService.transfer(sourceId, targetId, new BigDecimal("500"), null);
+            transactionService.transfer(sourceId, targetId, new BigDecimal("500"), null, IDEMPOTENCY_KEY);
 
             assertThat(target.getBalance()).isEqualByComparingTo(new BigDecimal("500"));
         }
@@ -113,7 +125,7 @@ class TransactionServiceTest {
         @DisplayName("should fail transfer when source has insufficient balance")
         void should_FailTransfer_When_InsufficientBalance() {
             Transaction result = transactionService.transfer(
-                sourceId, targetId, new BigDecimal("500"), null);
+                sourceId, targetId, new BigDecimal("500"), null, IDEMPOTENCY_KEY);
 
             assertThat(result.getStatus()).isEqualTo(TransactionStatus.FAILED);
             assertThat(result.getFailureReason()).isNotBlank();
@@ -122,7 +134,7 @@ class TransactionServiceTest {
         @Test
         @DisplayName("should not change balances when transfer fails due to insufficient funds")
         void should_NotChangeBalances_When_TransferFails() {
-            transactionService.transfer(sourceId, targetId, new BigDecimal("500"), null);
+            transactionService.transfer(sourceId, targetId, new BigDecimal("500"), null, IDEMPOTENCY_KEY);
 
             verify(accountRepository, never()).save(any(Account.class));
             assertThat(target.getBalance()).isEqualByComparingTo(BigDecimal.ZERO);
@@ -137,7 +149,7 @@ class TransactionServiceTest {
         @DisplayName("should throw IllegalArgumentException when transferring to same account")
         void should_ThrowException_When_SameAccount() {
             assertThatThrownBy(() ->
-                transactionService.transfer(sourceId, sourceId, new BigDecimal("100"), null))
+                transactionService.transfer(sourceId, sourceId, new BigDecimal("100"), null, IDEMPOTENCY_KEY))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("same account");
         }
@@ -148,7 +160,7 @@ class TransactionServiceTest {
             when(accountRepository.findById(sourceId)).thenReturn(Optional.empty());
 
             assertThatThrownBy(() ->
-                transactionService.transfer(sourceId, targetId, new BigDecimal("100"), null))
+                transactionService.transfer(sourceId, targetId, new BigDecimal("100"), null, IDEMPOTENCY_KEY))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining(sourceId.toString());
         }
@@ -160,7 +172,7 @@ class TransactionServiceTest {
             when(accountRepository.findById(targetId)).thenReturn(Optional.empty());
 
             assertThatThrownBy(() ->
-                transactionService.transfer(sourceId, targetId, new BigDecimal("100"), null))
+                transactionService.transfer(sourceId, targetId, new BigDecimal("100"), null, IDEMPOTENCY_KEY))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining(targetId.toString());
         }
@@ -169,7 +181,7 @@ class TransactionServiceTest {
         @DisplayName("should throw IllegalArgumentException when amount exceeds maximum limit")
         void should_ThrowException_When_AmountExceedsLimit() {
             assertThatThrownBy(() ->
-                transactionService.transfer(sourceId, targetId, new BigDecimal("1000001"), null))
+                transactionService.transfer(sourceId, targetId, new BigDecimal("1000001"), null, IDEMPOTENCY_KEY))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("maximum limit");
         }
@@ -190,7 +202,7 @@ class TransactionServiceTest {
             when(accountRepository.findById(targetId)).thenReturn(Optional.of(target));
 
             assertThatThrownBy(() ->
-                transactionService.transfer(sourceId, targetId, new BigDecimal("100"), null))
+                transactionService.transfer(sourceId, targetId, new BigDecimal("100"), null, IDEMPOTENCY_KEY))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("not active");
         }
