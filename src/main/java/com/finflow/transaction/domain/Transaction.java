@@ -39,6 +39,12 @@ public class Transaction {
     @Column(name = "failure_reason", length = 500)
     private String failureReason;
 
+    @Column(name = "initiated_by", length = 255)
+    private String initiatedBy;
+
+    @Column(name = "ip_address", length = 45)
+    private String ipAddress;
+
     @Version
     private Long version;
 
@@ -52,12 +58,14 @@ public class Transaction {
     }
 
     public Transaction(UUID sourceAccountId, UUID targetAccountId,
-                       BigDecimal amount, String currency, String description) {
+                       BigDecimal amount, String currency, String description,
+                       String initiatedBy) {
         this.sourceAccountId = sourceAccountId;
         this.targetAccountId = targetAccountId;
         this.amount = amount;
         this.currency = currency;
         this.description = description;
+        this.initiatedBy = initiatedBy;
         this.status = TransactionStatus.PENDING;
         this.type = TransactionType.TRANSFER;
     }
@@ -98,6 +106,14 @@ public class Transaction {
         this.status = TransactionStatus.FLAGGED;
     }
 
+    public void reverse() {
+        if (this.status != TransactionStatus.FAILED) {
+            throw new IllegalStateException(
+                "Cannot reverse transaction in status: " + this.status);
+        }
+        this.status = TransactionStatus.REVERSED;
+    }
+
     // Getters
     public UUID getId() { return id; }
     public UUID getSourceAccountId() { return sourceAccountId; }
@@ -108,6 +124,8 @@ public class Transaction {
     public TransactionType getType() { return type; }
     public String getDescription() { return description; }
     public String getFailureReason() { return failureReason; }
+    public String getInitiatedBy() { return initiatedBy; }
+    public String getIpAddress() { return ipAddress; }
     public Long getVersion() { return version; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }

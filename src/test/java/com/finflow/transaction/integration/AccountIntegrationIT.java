@@ -88,7 +88,7 @@ class AccountIntegrationIT {
 
         Transaction transaction = new Transaction(
             source.getId(), target.getId(),
-            new BigDecimal("100.00"), "CHF", "Test payment"
+            new BigDecimal("100.00"), "CHF", "Test payment", "SYSTEM"
         );
         transaction.complete();
         Transaction saved = transactionRepository.save(transaction);

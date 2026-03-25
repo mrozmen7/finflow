@@ -1,3 +1,19 @@
+jwt:
+  secret: dGVzdC1qd3Qtc2VjcmV0LWtleS1mb3ItdGVzdGluZy1vbmx5LTI1NmJpdA==
+  expiration: 86400000
+
+resilience4j:
+  retry:
+    instances:
+      transferRetry:
+        max-attempts: 1
+  circuit-breaker:
+    instances:
+      getAccountCB:
+        failure-rate-threshold: 100
+        minimum-number-of-calls: 100
+        sliding-window-size: 100
+
 spring:
   jpa:
     hibernate:

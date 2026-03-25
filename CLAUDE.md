@@ -113,6 +113,12 @@ Run `make docker-up` before starting the app locally. Both services have healthc
 - YOLO mode: DISABLED
 - JWT authentication required for all `/api/**` endpoints
 - Every endpoint must have proper authorization
+- Public endpoints (no token required): `POST /api/v1/auth/login`, `POST /api/v1/accounts`, Swagger UI
+- Login: `POST /api/v1/auth/login` with `{"username":"admin","password":"admin123"}` → returns `{"token":"...", "tokenType":"Bearer", "expiresIn":86400}`
+- Token usage: `Authorization: Bearer <token>` header
+- `JwtProperties` (`jwt.secret`, `jwt.expiration`) — configured in application-dev.yml and application-test.yml
+- `AuthController` is temporary (hardcoded credentials) — replace when User entity is implemented
+- Spring Security classes live in `shared/security`; `JwtProperties` and `OpenApiConfig` live in `shared/config`
 
 ## Model Policy
 - Default model: Sonnet (CRUD, DTO, Service, Test, Controller)

@@ -7,8 +7,10 @@ import com.finflow.shared.util.RateLimiterService;
 import com.finflow.transaction.domain.Account;
 import com.finflow.transaction.domain.AccountStatus;
 import com.finflow.transaction.domain.Transaction;
+import com.finflow.transaction.domain.TransactionStatus;
 import com.finflow.transaction.infrastructure.AccountRepository;
 import com.finflow.transaction.infrastructure.TransactionRepository;
+import io.github.resilience4j.retry.annotation.Retry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
@@ -41,9 +43,11 @@ public class TransactionService {
         this.rateLimiterService = rateLimiterService;
     }
 
+    @Retry(name = "transferRetry")
     @Transactional
     public Transaction transfer(UUID sourceAccountId, UUID targetAccountId,
-                                BigDecimal amount, String description, String idempotencyKey) {
+                                BigDecimal amount, String description,
+                                String idempotencyKey, String initiatedBy) {
 
         // Rate limit check — max 10 transfers per account per minute
         if (!rateLimiterService.isAllowed(sourceAccountId)) {
@@ -90,7 +94,7 @@ public class TransactionService {
         // Create transaction record
         Transaction transaction = new Transaction(
             sourceAccountId, targetAccountId,
-            amount, source.getCurrency(), description
+            amount, source.getCurrency(), description, initiatedBy
         );
 
         try {
@@ -118,6 +122,33 @@ public class TransactionService {
 
         Transaction saved = transactionRepository.save(transaction);
         idempotencyService.store(idempotencyKey, saved.getId());
+        return saved;
+    }
+
+    @Transactional
+    public Transaction reverseTransaction(UUID transactionId) {
+        Transaction transaction = transactionRepository.findById(transactionId)
+            .orElseThrow(() -> new ResourceNotFoundException(
+                "Transaction", "id", transactionId));
+
+        if (transaction.getStatus() != TransactionStatus.FAILED) {
+            throw new IllegalStateException(
+                "Cannot reverse transaction with status: " + transaction.getStatus());
+        }
+
+        Account source = accountRepository.findById(transaction.getSourceAccountId())
+            .orElseThrow(() -> new ResourceNotFoundException(
+                "Account", "id", transaction.getSourceAccountId()));
+
+        source.deposit(transaction.getAmount());
+        accountRepository.save(source);
+
+        transaction.reverse();
+        Transaction saved = transactionRepository.save(transaction);
+
+        log.info("Transaction reversed: {}, amount {} returned to source account {}",
+                 transactionId, transaction.getAmount(), transaction.getSourceAccountId());
+
         return saved;
     }
 

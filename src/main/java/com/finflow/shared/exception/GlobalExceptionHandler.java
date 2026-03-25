@@ -4,6 +4,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -73,6 +77,19 @@ public class GlobalExceptionHandler {
         return problem;
     }
 
+    @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
+    public ProblemDetail handleOptimisticLocking(ObjectOptimisticLockingFailureException ex) {
+        log.warn("Optimistic locking failure: {}", ex.getMessage());
+
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+            HttpStatus.CONFLICT, "Concurrent modification detected, please retry"
+        );
+        problem.setTitle("Concurrent Modification");
+        problem.setType(URI.create("https://finflow.com/errors/conflict"));
+        problem.setProperty("timestamp", Instant.now());
+        return problem;
+    }
+
     @ExceptionHandler(RateLimitExceededException.class)
     public ProblemDetail handleRateLimitExceeded(RateLimitExceededException ex) {
         log.warn("Rate limit exceeded: {}", ex.getMessage());
@@ -82,6 +99,45 @@ public class GlobalExceptionHandler {
         );
         problem.setTitle("Rate Limit Exceeded");
         problem.setType(URI.create("https://finflow.com/errors/rate-limit"));
+        problem.setProperty("timestamp", Instant.now());
+        return problem;
+    }
+
+    @ExceptionHandler(CallNotPermittedException.class)
+    public ProblemDetail handleCircuitBreakerOpen(CallNotPermittedException ex) {
+        log.warn("Circuit breaker open: {}", ex.getMessage());
+
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+            HttpStatus.SERVICE_UNAVAILABLE, "Service temporarily unavailable, please retry later"
+        );
+        problem.setTitle("Service Unavailable");
+        problem.setType(URI.create("https://finflow.com/errors/service-unavailable"));
+        problem.setProperty("timestamp", Instant.now());
+        return problem;
+    }
+
+    @ExceptionHandler(AuthenticationException.class)
+    public ProblemDetail handleAuthentication(AuthenticationException ex) {
+        log.warn("Authentication failed: {}", ex.getMessage());
+
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+            HttpStatus.UNAUTHORIZED, "Authentication required"
+        );
+        problem.setTitle("Unauthorized");
+        problem.setType(URI.create("https://finflow.com/errors/unauthorized"));
+        problem.setProperty("timestamp", Instant.now());
+        return problem;
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ProblemDetail handleAccessDenied(AccessDeniedException ex) {
+        log.warn("Access denied: {}", ex.getMessage());
+
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+            HttpStatus.FORBIDDEN, "Access denied"
+        );
+        problem.setTitle("Forbidden");
+        problem.setType(URI.create("https://finflow.com/errors/forbidden"));
         problem.setProperty("timestamp", Instant.now());
         return problem;
     }

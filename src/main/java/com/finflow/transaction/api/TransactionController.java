@@ -44,7 +44,8 @@ public class TransactionController {
             request.targetAccountId(),
             request.amount(),
             request.description(),
-            request.idempotencyKey()
+            request.idempotencyKey(),
+            "SYSTEM" // TODO: replace with authenticated user when JWT is implemented
         );
 
         HttpStatus status = transaction.getStatus().name().equals("COMPLETED")
@@ -62,6 +63,19 @@ public class TransactionController {
     public ResponseEntity<TransactionResponse> getTransaction(@PathVariable UUID id) {
 
         Transaction transaction = transactionService.getTransaction(id);
+
+        return ResponseEntity.ok(TransactionMapper.toResponse(transaction));
+    }
+
+    /**
+     * Reverse a failed transaction, returning the amount to the source account.
+     */
+    @PostMapping("/{id}/reverse")
+    public ResponseEntity<TransactionResponse> reverseTransaction(@PathVariable UUID id) {
+
+        log.info("POST /transactions/{}/reverse", id);
+
+        Transaction transaction = transactionService.reverseTransaction(id);
 
         return ResponseEntity.ok(TransactionMapper.toResponse(transaction));
     }

@@ -3,6 +3,8 @@ package com.finflow.transaction.application;
 import com.finflow.shared.exception.ResourceNotFoundException;
 import com.finflow.transaction.domain.Account;
 import com.finflow.transaction.infrastructure.AccountRepository;
+import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -51,11 +53,17 @@ public class AccountService {
         return saved;
     }
 
+    @CircuitBreaker(name = "getAccountCB", fallbackMethod = "getAccountFallback")
     @Transactional(readOnly = true)
     public Account getAccount(UUID accountId) {
         log.debug("Fetching account: {}", accountId);
 
         return accountRepository.findById(accountId)
             .orElseThrow(() -> new ResourceNotFoundException("Account", "id", accountId));
+    }
+
+    private Account getAccountFallback(UUID accountId, CallNotPermittedException ex) {
+        log.error("Circuit breaker open for getAccount, accountId={}: {}", accountId, ex.getMessage());
+        throw new IllegalStateException("Account service temporarily unavailable, please retry later");
     }
 }
