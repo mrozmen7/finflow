@@ -8,6 +8,7 @@ import com.finflow.fraud.domain.TransactionEventPayload;
 import com.finflow.fraud.infrastructure.FraudCaseRepository;
 import com.finflow.fraud.infrastructure.FraudRuleRepository;
 import com.finflow.transaction.application.OutboxService;
+import com.finflow.transaction.application.TransactionMetrics;
 import com.finflow.transaction.domain.Transaction;
 import com.finflow.transaction.domain.TransactionStatus;
 import com.finflow.transaction.infrastructure.TransactionRepository;
@@ -46,6 +47,9 @@ class FraudAnalysisServiceTest {
 
     @Mock
     private OutboxService outboxService;
+
+    @Mock
+    private TransactionMetrics transactionMetrics;
 
     @InjectMocks
     private FraudAnalysisService fraudAnalysisService;

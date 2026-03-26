@@ -1,6 +1,7 @@
 package com.finflow.shared.security;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.finflow.shared.config.CorrelationIdFilter;
 import com.finflow.shared.config.JwtProperties;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
@@ -32,16 +33,22 @@ public class SecurityConfig {
         "/swagger-ui/**", "/swagger-ui.html", "/api-docs/**", "/api-docs"
     };
 
+    private static final String[] ACTUATOR_PATHS = {
+        "/actuator", "/actuator/**"
+    };
+
     private final JwtService jwtService;
+    private final CorrelationIdFilter correlationIdFilter;
     private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
 
-    public SecurityConfig(JwtService jwtService) {
+    public SecurityConfig(JwtService jwtService, CorrelationIdFilter correlationIdFilter) {
         this.jwtService = jwtService;
+        this.correlationIdFilter = correlationIdFilter;
     }
 
     /**
      * Configures the security filter chain with JWT authentication.
-     * Public endpoints: POST /accounts (account creation), /auth/**, Swagger UI.
+     * Public endpoints: POST /accounts (account creation), /auth/**, Swagger UI, /actuator/**.
      * All other /api/** endpoints require a valid Bearer token.
      */
     @Bean
@@ -51,10 +58,12 @@ public class SecurityConfig {
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(SWAGGER_PATHS).permitAll()
+                .requestMatchers(ACTUATOR_PATHS).permitAll()
                 .requestMatchers("/auth/**").permitAll()
                 .requestMatchers(HttpMethod.POST, "/accounts").permitAll()
                 .anyRequest().authenticated()
             )
+            .addFilterBefore(correlationIdFilter, UsernamePasswordAuthenticationFilter.class)
             .addFilterBefore(new JwtAuthenticationFilter(jwtService),
                 UsernamePasswordAuthenticationFilter.class)
             .exceptionHandling(e -> e

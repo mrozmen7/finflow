@@ -7,6 +7,7 @@ import com.finflow.fraud.domain.TransactionEventPayload;
 import com.finflow.fraud.infrastructure.FraudCaseRepository;
 import com.finflow.fraud.infrastructure.FraudRuleRepository;
 import com.finflow.transaction.application.OutboxService;
+import com.finflow.transaction.application.TransactionMetrics;
 import com.finflow.transaction.domain.Transaction;
 import com.finflow.transaction.infrastructure.TransactionRepository;
 import org.slf4j.Logger;
@@ -51,21 +52,25 @@ public class FraudAnalysisService {
     private final FraudCaseRepository fraudCaseRepository;
     private final TransactionRepository transactionRepository;
     private final OutboxService outboxService;
+    private final TransactionMetrics transactionMetrics;
 
     /**
      * @param fraudRuleRepository    repository for loading active rules
      * @param fraudCaseRepository   repository for persisting detected fraud cases
      * @param transactionRepository repository for loading and updating the flagged transaction
      * @param outboxService         outbox writer for publishing fraud alert events
+     * @param transactionMetrics    metrics recorder for fraud detection counter
      */
     public FraudAnalysisService(FraudRuleRepository fraudRuleRepository,
                                 FraudCaseRepository fraudCaseRepository,
                                 TransactionRepository transactionRepository,
-                                OutboxService outboxService) {
+                                OutboxService outboxService,
+                                TransactionMetrics transactionMetrics) {
         this.fraudRuleRepository = fraudRuleRepository;
         this.fraudCaseRepository = fraudCaseRepository;
         this.transactionRepository = transactionRepository;
         this.outboxService = outboxService;
+        this.transactionMetrics = transactionMetrics;
     }
 
     /**
@@ -85,6 +90,7 @@ public class FraudAnalysisService {
             FraudCase savedCase = persistFraudCase(event);
             flagTransaction(event);
             publishFraudAlert(savedCase, event);
+            transactionMetrics.recordFraudDetected();
 
             log.warn("Transaction {} flagged, fraud case {} created, alert published",
                      event.transactionId(), savedCase.getId());

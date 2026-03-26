@@ -4,6 +4,7 @@ import com.finflow.shared.exception.ResourceNotFoundException;
 import com.finflow.shared.util.IdempotencyService;
 import com.finflow.shared.util.RateLimiterService;
 import com.finflow.transaction.application.OutboxService;
+import com.finflow.transaction.application.TransactionMetrics;
 import com.finflow.transaction.application.TransactionService;
 import com.finflow.transaction.domain.Account;
 import com.finflow.transaction.domain.AccountStatus;
@@ -47,6 +48,9 @@ class TransactionServiceTest {
 
     @Mock
     private OutboxService outboxService;
+
+    @Mock
+    private TransactionMetrics transactionMetrics;
 
     @InjectMocks
     private TransactionService transactionService;

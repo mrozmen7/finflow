@@ -34,17 +34,20 @@ public class TransactionService {
     private final IdempotencyService idempotencyService;
     private final RateLimiterService rateLimiterService;
     private final OutboxService outboxService;
+    private final TransactionMetrics transactionMetrics;
 
     public TransactionService(TransactionRepository transactionRepository,
                               AccountRepository accountRepository,
                               IdempotencyService idempotencyService,
                               RateLimiterService rateLimiterService,
-                              OutboxService outboxService) {
+                              OutboxService outboxService,
+                              TransactionMetrics transactionMetrics) {
         this.transactionRepository = transactionRepository;
         this.accountRepository = accountRepository;
         this.idempotencyService = idempotencyService;
         this.rateLimiterService = rateLimiterService;
         this.outboxService = outboxService;
+        this.transactionMetrics = transactionMetrics;
     }
 
     @Retry(name = "transferRetry")
@@ -71,6 +74,8 @@ public class TransactionService {
 
         log.info("Transfer initiated: {} -> {}, amount: {}",
                  sourceAccountId, targetAccountId, amount);
+
+        long startTime = System.currentTimeMillis();
 
         // Validation
         validateTransferRequest(sourceAccountId, targetAccountId, amount);
@@ -132,6 +137,9 @@ public class TransactionService {
             : "TRANSACTION_FAILED";
         outboxService.saveEvent("Transaction", saved.getId(), eventType,
             TransactionEvent.from(saved));
+
+        transactionMetrics.recordTransfer(saved.getStatus().name());
+        transactionMetrics.recordTransferDuration(System.currentTimeMillis() - startTime);
 
         return saved;
     }
