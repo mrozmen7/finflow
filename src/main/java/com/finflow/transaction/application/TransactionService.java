@@ -7,6 +7,7 @@ import com.finflow.shared.util.RateLimiterService;
 import com.finflow.transaction.domain.Account;
 import com.finflow.transaction.domain.AccountStatus;
 import com.finflow.transaction.domain.Transaction;
+import com.finflow.transaction.domain.TransactionEvent;
 import com.finflow.transaction.domain.TransactionStatus;
 import com.finflow.transaction.infrastructure.AccountRepository;
 import com.finflow.transaction.infrastructure.TransactionRepository;
@@ -32,15 +33,18 @@ public class TransactionService {
     private final AccountRepository accountRepository;
     private final IdempotencyService idempotencyService;
     private final RateLimiterService rateLimiterService;
+    private final OutboxService outboxService;
 
     public TransactionService(TransactionRepository transactionRepository,
                               AccountRepository accountRepository,
                               IdempotencyService idempotencyService,
-                              RateLimiterService rateLimiterService) {
+                              RateLimiterService rateLimiterService,
+                              OutboxService outboxService) {
         this.transactionRepository = transactionRepository;
         this.accountRepository = accountRepository;
         this.idempotencyService = idempotencyService;
         this.rateLimiterService = rateLimiterService;
+        this.outboxService = outboxService;
     }
 
     @Retry(name = "transferRetry")
@@ -122,6 +126,13 @@ public class TransactionService {
 
         Transaction saved = transactionRepository.save(transaction);
         idempotencyService.store(idempotencyKey, saved.getId());
+
+        String eventType = saved.getStatus() == TransactionStatus.COMPLETED
+            ? "TRANSACTION_COMPLETED"
+            : "TRANSACTION_FAILED";
+        outboxService.saveEvent("Transaction", saved.getId(), eventType,
+            TransactionEvent.from(saved));
+
         return saved;
     }
 

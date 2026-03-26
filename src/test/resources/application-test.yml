@@ -14,7 +14,22 @@ resilience4j:
         minimum-number-of-calls: 100
         sliding-window-size: 100
 
+app:
+  scheduling:
+    enabled: false
+
 spring:
+  kafka:
+    bootstrap-servers: localhost:9092
+    admin:
+      fail-fast: false
+    listener:
+      auto-startup: false
+    consumer:
+      group-id: finflow-fraud-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
   jpa:
     hibernate:
       ddl-auto: validate

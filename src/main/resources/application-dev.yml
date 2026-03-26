@@ -18,6 +18,16 @@ spring:
     redis:
       host: localhost
       port: 6379
+  kafka:
+    bootstrap-servers: localhost:9092
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+    consumer:
+      group-id: finflow-fraud-group
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
 
 jwt:
   secret: ZmluZmxvdy1kZXYtand0LXNlY3JldC1rZXktMjU2LWJpdC1kZXYtb25seS1ub3QtZm9yLXByb2Q=
