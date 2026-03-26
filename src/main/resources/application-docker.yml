@@ -1,0 +1,8 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://finflow-postgres:5432/finflow
+  data:
+    redis:
+      host: finflow-redis
+  kafka:
+    bootstrap-servers: finflow-kafka:29092
